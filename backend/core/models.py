@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 
 
 class Loft(models.Model):
@@ -46,7 +47,9 @@ class ClothRoll(models.Model):
 
 
 class DipRun(models.Model):
-    roll = models.ForeignKey(ClothRoll, on_delete=models.CASCADE, related_name="dip_runs")
+    roll = models.ForeignKey(
+        ClothRoll, on_delete=models.CASCADE, related_name="dip_runs"
+    )
     started_at = models.DateTimeField()
     resin_pct = models.DecimalField(max_digits=5, decimal_places=2)
     cure_hours = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
@@ -55,6 +58,14 @@ class DipRun(models.Model):
 
     class Meta:
         ordering = ["-started_at"]
+        constraints = [
+            # 同一卷只允许一版浸渍记录：连点/两名浸胶工交叉写入时后写覆盖先写
+            models.UniqueConstraint(fields=["roll"], name="uniq_diprun_one_per_roll"),
+            # 树脂百分比必须为正数（0、负数不入库）
+            models.CheckConstraint(
+                check=Q(resin_pct__gt=0), name="chk_diprun_resin_positive"
+            ),
+        ]
 
     def __str__(self):
         return f"Dip@{self.roll_id} {self.started_at}"

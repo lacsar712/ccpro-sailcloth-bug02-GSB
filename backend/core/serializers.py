@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import ClothRoll, DipRun, Loft
@@ -69,7 +71,7 @@ class DipRunSerializer(serializers.ModelSerializer):
     )
     startedAt = serializers.DateTimeField(source="started_at")
     resinPct = serializers.DecimalField(
-        source="resin_pct", max_digits=5, decimal_places=2, min_value=None
+        source="resin_pct", max_digits=5, decimal_places=2
     )
     cureHours = serializers.DecimalField(
         source="cure_hours",
@@ -97,4 +99,7 @@ class DipRunSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "rollCode", "loftName", "created_at")
 
     def validate_resinPct(self, value):
+        # 树脂百分比必须为正数：0、负数一律中文挡下且不入库
+        if value is None or value <= Decimal("0"):
+            raise serializers.ValidationError("树脂百分比必须为正数，不能为 0 或负数")
         return value

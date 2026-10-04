@@ -89,13 +89,29 @@ async function setStatus(status) {
   }
 }
 
+function validateResin() {
+  const raw = dipForm.resinPct
+  const v = Number(raw)
+  if (raw === '' || raw === null || Number.isNaN(v)) {
+    panelError.value = '请填写树脂百分比，且必须为正数'
+    return false
+  }
+  if (v <= 0) {
+    panelError.value = '树脂百分比必须为正数，不能为 0 或负数'
+    return false
+  }
+  return true
+}
+
 async function logDip() {
-  if (!selected.value) return
+  if (!selected.value || panelBusy.value) return
   panelError.value = ''
+  if (!validateResin()) return
+  panelBusy.value = true
   const payload = {
     rollId: selected.value.id,
     startedAt: new Date(dipForm.startedAt).toISOString(),
-    resinPct: dipForm.resinPct,
+    resinPct: Number(dipForm.resinPct),
     cureHours:
       dipForm.cureHours === '' || dipForm.cureHours === null
         ? null
@@ -104,7 +120,6 @@ async function logDip() {
   }
   try {
     await api.post('/dips/', payload)
-    api.post('/dips/', payload).catch(() => {})
     if (selected.value.status === 'raw') {
       try {
         await api.patch(`/rolls/${selected.value.id}/`, { status: 'dipping' })
@@ -117,9 +132,11 @@ async function logDip() {
     dipForm.startedAt = localNow()
     await load()
   } catch (e) {
+    const data = e.response?.data
     panelError.value =
-      e.response?.data?.detail ||
-      JSON.stringify(e.response?.data) ||
+      data?.resinPct?.[0] ||
+      data?.detail ||
+      (data ? String(Object.values(data).flat()[0] ?? '') : '') ||
       '登记浸渍失败'
   } finally {
     panelBusy.value = false
@@ -247,7 +264,7 @@ onMounted(load)
           <input v-model="dipForm.startedAt" type="datetime-local" required />
         </label>
         <label>树脂 %
-          <input v-model.number="dipForm.resinPct" type="number" step="0.1" required />
+          <input v-model.number="dipForm.resinPct" type="number" step="0.1" min="0.01" required />
         </label>
         <label>固化时长 h（可空）
           <input v-model="dipForm.cureHours" type="number" step="0.1" />

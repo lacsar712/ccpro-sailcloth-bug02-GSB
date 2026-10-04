@@ -5,6 +5,7 @@ import api from '../api'
 const dips = ref([])
 const rolls = ref([])
 const error = ref('')
+const busy = ref(false)
 const form = reactive({
   rollId: null,
   startedAt: '',
@@ -33,12 +34,23 @@ async function load() {
 }
 
 async function create() {
+  if (busy.value) return
   error.value = ''
+  const v = Number(form.resinPct)
+  if (form.resinPct === '' || form.resinPct === null || Number.isNaN(v)) {
+    error.value = '请填写树脂百分比，且必须为正数'
+    return
+  }
+  if (v <= 0) {
+    error.value = '树脂百分比必须为正数，不能为 0 或负数'
+    return
+  }
+  busy.value = true
   try {
     const payload = {
       rollId: form.rollId,
       startedAt: new Date(form.startedAt).toISOString(),
-      resinPct: form.resinPct,
+      resinPct: v,
       cureHours: form.cureHours === '' || form.cureHours === null ? null : form.cureHours,
       notes: form.notes,
     }
@@ -48,7 +60,14 @@ async function create() {
     form.startedAt = localNow()
     await load()
   } catch (e) {
-    error.value = e.response?.data?.detail || JSON.stringify(e.response?.data) || '创建失败'
+    const data = e.response?.data
+    error.value =
+      data?.resinPct?.[0] ||
+      data?.detail ||
+      (data ? String(Object.values(data).flat()[0] ?? '') : '') ||
+      '创建失败'
+  } finally {
+    busy.value = false
   }
 }
 
@@ -71,7 +90,7 @@ onMounted(load)
         <input v-model="form.startedAt" type="datetime-local" required />
       </label>
       <label>树脂 %
-        <input v-model.number="form.resinPct" type="number" step="0.1" required />
+        <input v-model.number="form.resinPct" type="number" step="0.1" min="0.01" required />
       </label>
       <label>固化时长 h（可空）
         <input v-model="form.cureHours" type="number" step="0.1" />
@@ -79,7 +98,7 @@ onMounted(load)
       <label>备注
         <input v-model="form.notes" />
       </label>
-      <button class="btn" type="submit">登记</button>
+      <button class="btn" type="submit" :disabled="busy">登记</button>
     </form>
 
     <table>
