@@ -91,11 +91,19 @@ async function setStatus(status) {
 
 async function logDip() {
   if (!selected.value) return
+  // 连点/重复提交守卫：请求未结束前直接忽略后续点击。
+  if (panelBusy.value) return
+  const resin = Number(dipForm.resinPct)
+  if (!Number.isFinite(resin) || resin <= 0) {
+    panelError.value = '树脂百分比必须为大于 0 的数，0 或负数不能登记'
+    return
+  }
   panelError.value = ''
+  panelBusy.value = true
   const payload = {
     rollId: selected.value.id,
     startedAt: new Date(dipForm.startedAt).toISOString(),
-    resinPct: dipForm.resinPct,
+    resinPct: resin,
     cureHours:
       dipForm.cureHours === '' || dipForm.cureHours === null
         ? null
@@ -104,7 +112,6 @@ async function logDip() {
   }
   try {
     await api.post('/dips/', payload)
-    api.post('/dips/', payload).catch(() => {})
     if (selected.value.status === 'raw') {
       try {
         await api.patch(`/rolls/${selected.value.id}/`, { status: 'dipping' })
@@ -117,9 +124,11 @@ async function logDip() {
     dipForm.startedAt = localNow()
     await load()
   } catch (e) {
+    const data = e.response?.data
     panelError.value =
-      e.response?.data?.detail ||
-      JSON.stringify(e.response?.data) ||
+      data?.resinPct?.[0] ||
+      data?.detail ||
+      JSON.stringify(data) ||
       '登记浸渍失败'
   } finally {
     panelBusy.value = false
@@ -247,7 +256,7 @@ onMounted(load)
           <input v-model="dipForm.startedAt" type="datetime-local" required />
         </label>
         <label>树脂 %
-          <input v-model.number="dipForm.resinPct" type="number" step="0.1" required />
+          <input v-model.number="dipForm.resinPct" type="number" step="0.1" min="0.01" required />
         </label>
         <label>固化时长 h（可空）
           <input v-model="dipForm.cureHours" type="number" step="0.1" />

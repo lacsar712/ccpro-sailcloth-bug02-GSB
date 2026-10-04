@@ -5,6 +5,7 @@ import api from '../api'
 const dips = ref([])
 const rolls = ref([])
 const error = ref('')
+const submitting = ref(false)
 const form = reactive({
   rollId: null,
   startedAt: '',
@@ -34,11 +35,18 @@ async function load() {
 
 async function create() {
   error.value = ''
+  if (submitting.value) return
+  const resin = Number(form.resinPct)
+  if (!Number.isFinite(resin) || resin <= 0) {
+    error.value = '树脂百分比必须为大于 0 的数，0 或负数不能登记'
+    return
+  }
+  submitting.value = true
   try {
     const payload = {
       rollId: form.rollId,
       startedAt: new Date(form.startedAt).toISOString(),
-      resinPct: form.resinPct,
+      resinPct: resin,
       cureHours: form.cureHours === '' || form.cureHours === null ? null : form.cureHours,
       notes: form.notes,
     }
@@ -48,7 +56,11 @@ async function create() {
     form.startedAt = localNow()
     await load()
   } catch (e) {
-    error.value = e.response?.data?.detail || JSON.stringify(e.response?.data) || '创建失败'
+    const data = e.response?.data
+    error.value =
+      data?.resinPct?.[0] || data?.detail || JSON.stringify(data) || '创建失败'
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -71,7 +83,7 @@ onMounted(load)
         <input v-model="form.startedAt" type="datetime-local" required />
       </label>
       <label>树脂 %
-        <input v-model.number="form.resinPct" type="number" step="0.1" required />
+        <input v-model.number="form.resinPct" type="number" step="0.1" min="0.01" required />
       </label>
       <label>固化时长 h（可空）
         <input v-model="form.cureHours" type="number" step="0.1" />
@@ -79,7 +91,7 @@ onMounted(load)
       <label>备注
         <input v-model="form.notes" />
       </label>
-      <button class="btn" type="submit">登记</button>
+      <button class="btn" type="submit" :disabled="submitting">登记</button>
     </form>
 
     <table>

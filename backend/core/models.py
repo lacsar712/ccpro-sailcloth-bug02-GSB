@@ -46,7 +46,11 @@ class ClothRoll(models.Model):
 
 
 class DipRun(models.Model):
-    roll = models.ForeignKey(ClothRoll, on_delete=models.CASCADE, related_name="dip_runs")
+    # 业务语义：同一布卷的浸渍登记只保留一版（连点/交叉写入按最后一次合法提交顶替）。
+    # 数据库层用 (roll) 唯一约束兜底，任何写入路径都无法让同卷出现两条记录。
+    roll = models.ForeignKey(
+        ClothRoll, on_delete=models.CASCADE, related_name="dip_runs"
+    )
     started_at = models.DateTimeField()
     resin_pct = models.DecimalField(max_digits=5, decimal_places=2)
     cure_hours = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
@@ -55,6 +59,9 @@ class DipRun(models.Model):
 
     class Meta:
         ordering = ["-started_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["roll"], name="uniq_dip_run_per_roll"),
+        ]
 
     def __str__(self):
         return f"Dip@{self.roll_id} {self.started_at}"

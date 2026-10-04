@@ -1,7 +1,12 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import ClothRoll, DipRun, Loft
 from .rules import can_mark_roll_cured
+
+# 树脂百分比必须为正数；上限只是字段位数（999.99）的业务收敛。
+MIN_RESIN_PCT = Decimal("0.01")
 
 
 class LoftSerializer(serializers.ModelSerializer):
@@ -69,7 +74,17 @@ class DipRunSerializer(serializers.ModelSerializer):
     )
     startedAt = serializers.DateTimeField(source="started_at")
     resinPct = serializers.DecimalField(
-        source="resin_pct", max_digits=5, decimal_places=2, min_value=None
+        source="resin_pct",
+        max_digits=5,
+        decimal_places=2,
+        min_value=MIN_RESIN_PCT,
+        error_messages={
+            "min_value": "树脂百分比必须为大于 0 的数，0 或负数不能登记",
+            "invalid": "树脂百分比必须是数字",
+            "max_digits": "树脂百分比位数超出范围",
+            "max_decimal_places": "树脂百分比最多保留两位小数",
+            "required": "请填写树脂百分比",
+        },
     )
     cureHours = serializers.DecimalField(
         source="cure_hours",
@@ -95,6 +110,3 @@ class DipRunSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = ("id", "rollCode", "loftName", "created_at")
-
-    def validate_resinPct(self, value):
-        return value
